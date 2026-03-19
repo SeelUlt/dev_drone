@@ -22,6 +22,8 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "JDY-09.h"
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -96,16 +98,51 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  // Приветственное сообщение
+  printf("\r\n");
+  printf("========================================\r\n");
+  printf("   Flight Controller v0.1\r\n");
+  printf("========================================\r\n");
+  printf("MCU: STM32F401CE\r\n");
+  printf("SYSCLK: 84 MHz\r\n");
+  printf("UART1 (USB-TTL): 115200 baud\r\n");
+  printf("UART2 (BT JDY-09): 115200 baud\r\n");
+  printf("========================================\r\n\r\n");
 
+  // Инициализация Bluetooth
+  BT_Init(&huart2);
+  printf("[OK] Bluetooth initialized\r\n");
+
+  // Тестовое сообщение
+  printf("[TEST] UART1 working!\r\n\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  BT_Control_t ctrl;
+  static uint32_t last_heartbeat = 0;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+  // Обработка команд от Bluetooth
+	  if (BT_GetControlData(&ctrl))
+	  {
+		  printf("[BT] P:%3d R:%3d Y:%3d T:%3d F:0x%02X\r\n",
+				 ctrl.pitch, ctrl.roll, ctrl.yaw, ctrl.throttle, ctrl.flags);
+	  }
+
+	  // Периодический "heartbeat" (раз в 2 секунды)
+	  if (HAL_GetTick() - last_heartbeat >= 2000)
+	  {
+		  printf("[HB] Uptime: %lu ms\r\n", HAL_GetTick());
+		  last_heartbeat = HAL_GetTick();
+	  }
+
+	  HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }

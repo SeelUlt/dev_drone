@@ -21,7 +21,26 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+#include <stdio.h>
 
+// Переопределение _write для printf → USART1
+#ifdef __GNUC__
+int __io_putchar(int ch)
+#else
+int fputc(int ch, FILE *f)
+#endif
+{
+    HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 100);
+    return ch;
+}
+
+// Резервный _write для совместимости
+int _write(int file, char *ptr, int len)
+{
+    (void)file;
+    HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 100);
+    return len;
+}
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
@@ -192,5 +211,14 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
+/* Core/Src/usart.c */
+
+#include "JDY-09.h"
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    // Передаем управление в библиотеку Bluetooth
+    BT_UART_Callback(huart, &huart2);
+}
 
 /* USER CODE END 1 */
