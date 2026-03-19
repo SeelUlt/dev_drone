@@ -1,0 +1,36 @@
+# STM32CubeIDE
+*.launch
+*.log
+*.tmp
+*.swp
+*.DS_Store
+
+# Build artifacts
+Debug/
+Release/
+build/
+*.o
+*.d
+*.elf
+*.map
+*.bin
+*.hex
+*.lst
+
+# IDE settings (локальные)
+.settings/
+.cproject
+.project
+
+# USB-TTL адаптеры (если есть драйверы)
+drivers/
+
+# Python venv (для RPi скриптов)
+venv/
+__pycache__/
+*.pyc
+
+# Секретные данные
+secrets/
+*.key
+*.pem
