@@ -1,4 +1,4 @@
-"./Core/Src/JDY-09.o"
+"./Core/Src/esp_bridge.o"
 "./Core/Src/gpio.o"
 "./Core/Src/main.o"
 "./Core/Src/spi.o"

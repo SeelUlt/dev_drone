@@ -4,16 +4,6 @@
   * @file           : main.c
   * @brief          : Main program body
   ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -22,7 +12,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "JDY-09.h"
+#include "esp_bridge.h"  // <-- Заменили JDY-09.h
 #include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -98,51 +88,58 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  // Приветственное сообщение
+
   printf("\r\n");
   printf("========================================\r\n");
-  printf("   Flight Controller v0.1\r\n");
+  printf("   Flight Controller v0.3\r\n");
   printf("========================================\r\n");
   printf("MCU: STM32F401CE\r\n");
   printf("SYSCLK: 84 MHz\r\n");
-  printf("UART1 (USB-TTL): 115200 baud\r\n");
-  printf("UART2 (BT JDY-09): 115200 baud\r\n");
+  printf("UART1 (PA9/10) Debug: 115200 baud\r\n");
+  printf("UART2 (PA2/3) ESP32-C3: 115200 baud\r\n");
   printf("========================================\r\n\r\n");
 
-  // Инициализация Bluetooth
-  BT_Init(&huart2);
-  printf("[OK] Bluetooth initialized\r\n");
+  ESP_Init(&huart2);  // USART2 для ESP32-C3
+  printf("[OK] ESP32-C3 Bridge initialized\r\n");
+  printf("[TEST] Debug UART working!\r\n\r\n");
 
-  // Тестовое сообщение
-  printf("[TEST] UART1 working!\r\n\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  BT_Control_t ctrl;
+  ESP_Control_t ctrl;
   static uint32_t last_heartbeat = 0;
+  static uint32_t last_data_print = 0;
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  // Обработка команд от Bluetooth
-	  if (BT_GetControlData(&ctrl))
-	  {
-		  printf("[BT] P:%3d R:%3d Y:%3d T:%3d F:0x%02X\r\n",
-				 ctrl.pitch, ctrl.roll, ctrl.yaw, ctrl.throttle, ctrl.flags);
-	  }
+    // Обработка команд от ESP32-C3
+    if (ESP_GetControlData(&ctrl))
+    {
+        // Печатаем данные не чаще чем раз в 100мс чтобы не забивать UART
+        if (HAL_GetTick() - last_data_print >= 100) {
+            printf("[ESP] P:%4d R:%4d Y:%4d T:%3d F:0x%02X\r\n",
+                   ctrl.pitch, ctrl.roll, ctrl.yaw, ctrl.throttle, ctrl.flags);
+            last_data_print = HAL_GetTick();
+        }
+    }
+    else if (ESP_CheckTimeout()) {
+        printf("[WARN] ESP32-C3 connection lost!\r\n");
+        HAL_Delay(500);  // Не спамим警告
+    }
 
-	  // Периодический "heartbeat" (раз в 2 секунды)
-	  if (HAL_GetTick() - last_heartbeat >= 2000)
-	  {
-		  printf("[HB] Uptime: %lu ms\r\n", HAL_GetTick());
-		  last_heartbeat = HAL_GetTick();
-	  }
+    // Периодический "heartbeat" (раз в 2 секунды)
+    if (HAL_GetTick() - last_heartbeat >= 2000)
+    {
+        printf("[HB] Uptime: %lu ms\r\n", HAL_GetTick());
+        last_heartbeat = HAL_GetTick();
+    }
 
-	  HAL_Delay(10);
+    HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -204,26 +201,17 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
   {
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
 #ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
-#endif /* USE_FULL_ASSERT */
+#endif
