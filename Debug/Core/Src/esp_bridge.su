@@ -1,4 +1,3 @@
-../Core/Src/esp_bridge.c:12:6:ESP_Init	16	static
-../Core/Src/esp_bridge.c:23:9:ESP_GetControlData	16	static
-../Core/Src/esp_bridge.c:32:9:ESP_CheckTimeout	8	static
-../Core/Src/esp_bridge.c:41:6:ESP_UART_Callback	24	static
+../Core/Src/esp_bridge.c:10:6:ESP_Init	16	static
+../Core/Src/esp_bridge.c:17:6:ESP_Poll	48	static
+../Core/Src/esp_bridge.c:71:9:ESP_CheckTimeout	16	static

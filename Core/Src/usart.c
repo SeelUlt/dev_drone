@@ -130,11 +130,11 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     }
 }
 
-/* USER CODE BEGIN 1 */
+/* USER CODE BEGIN 1 */ /*
 #include "esp_bridge.h"
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     ESP_UART_Callback(huart, &huart2);
-}
+} */
 /* USER CODE END 1 */

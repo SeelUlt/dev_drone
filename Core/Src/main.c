@@ -91,7 +91,7 @@ int main(void)
 
   printf("\r\n");
   printf("========================================\r\n");
-  printf("   Flight Controller v0.3\r\n");
+  printf("   Flight Controller v0.4 (Polling UART)\r\n");
   printf("========================================\r\n");
   printf("MCU: STM32F401CE\r\n");
   printf("SYSCLK: 84 MHz\r\n");
@@ -99,18 +99,18 @@ int main(void)
   printf("UART2 (PA2/3) ESP32-C3: 115200 baud\r\n");
   printf("========================================\r\n\r\n");
 
-  ESP_Init(&huart2);  // USART2 для ESP32-C3
+  ESP_Init(&huart2);
   printf("[OK] ESP32-C3 Bridge initialized\r\n");
   printf("[TEST] Debug UART working!\r\n\r\n");
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  ESP_Control_t ctrl;
+  ESP_Control_t ctrl = {0};
   static uint32_t last_heartbeat = 0;
   static uint32_t last_data_print = 0;
+
 
   while (1)
   {
@@ -118,31 +118,30 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     // Обработка команд от ESP32-C3
-    if (ESP_GetControlData(&ctrl))
-    {
-        // Печатаем данные не чаще чем раз в 100мс чтобы не забивать UART
-        if (HAL_GetTick() - last_data_print >= 100) {
-            printf("[ESP] P:%4d R:%4d Y:%4d T:%3d F:0x%02X\r\n",
-                   ctrl.pitch, ctrl.roll, ctrl.yaw, ctrl.throttle, ctrl.flags);
-            last_data_print = HAL_GetTick();
-        }
-    }
-    else if (ESP_CheckTimeout()) {
-        printf("[WARN] ESP32-C3 connection lost!\r\n");
-        HAL_Delay(500);  // Не спамим警告
-    }
+	    ESP_Poll(&huart2, &ctrl);
 
-    // Периодический "heartbeat" (раз в 2 секунды)
-    if (HAL_GetTick() - last_heartbeat >= 2000)
-    {
-        printf("[HB] Uptime: %lu ms\r\n", HAL_GetTick());
-        last_heartbeat = HAL_GetTick();
-    }
+	    // Обработка данных
+	    if (ctrl.is_valid && !ESP_CheckTimeout(&ctrl)) {
+	        if (HAL_GetTick() - last_data_print >= 100) {
+	            printf("[ESP] P:%4d R:%4d Y:%4d T:%3d F:0x%02X\r\n",
+	                   ctrl.pitch, ctrl.roll, ctrl.yaw, ctrl.throttle, ctrl.flags);
+	            last_data_print = HAL_GetTick();
+	        }
+	    }
+	    else if (ESP_CheckTimeout(&ctrl)) {
+	        printf("[WARN] ESP32-C3 connection lost!\r\n");
+	        HAL_Delay(500);
+	    }
 
-    HAL_Delay(10);
-  }
+	    // Heartbeat
+	    if (HAL_GetTick() - last_heartbeat >= 2000) {
+	        printf("[HB] Uptime: %lu ms\r\n", HAL_GetTick());
+	        last_heartbeat = HAL_GetTick();
+	    }
+
+	    HAL_Delay(10);
   /* USER CODE END 3 */
-}
+}}
 
 /**
   * @brief System Clock Configuration

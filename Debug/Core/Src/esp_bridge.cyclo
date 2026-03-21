@@ -1,4 +1,3 @@
-../Core/Src/esp_bridge.c:12:6:ESP_Init	1
-../Core/Src/esp_bridge.c:23:9:ESP_GetControlData	3
-../Core/Src/esp_bridge.c:32:9:ESP_CheckTimeout	2
-../Core/Src/esp_bridge.c:41:6:ESP_UART_Callback	7
+../Core/Src/esp_bridge.c:10:6:ESP_Init	1
+../Core/Src/esp_bridge.c:17:6:ESP_Poll	6
+../Core/Src/esp_bridge.c:71:9:ESP_CheckTimeout	3
