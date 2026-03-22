@@ -1,53 +1,39 @@
 import network
 import espnow
 import time
-import random
-import struct
-
-# Укажите реальный MAC-адрес ESP32-C3
-PEER_MAC = b'\x1c\xdb\xd4\xc3\xc90'   # замените на реальный
 
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
-time.sleep(0.5)
-wlan.disconnect()
-wlan.config(channel=1)
+wlan.config(channel=3)
 
-esp = espnow.ESPNow()
-esp.active(True)
-esp.add_peer(PEER_MAC)
+mac_address = b'\x1c\xdb\xd4\xc3\xc9\x30'
 
-print("ESP32 Classic generator ready")
-print("My MAC:", ':'.join('%02x' % b for b in wlan.config('mac')))
+e = espnow.ESPNow()
+e.active(True)
 
-BASE = [10, 0, 0, 50, 1]
-
-def make_packet():
-    roll    = BASE[0] + random.randint(-5, 5)
-    pitch   = BASE[1] + random.randint(-5, 5)
-    yaw     = BASE[2] + random.randint(-5, 5)
-    throttle= BASE[3] + random.randint(-5, 5)
-    flags   = BASE[4]
-    # 0xAA + 5 байт данных (всего 6 байт)
-    return b'\xAA' + struct.pack('bbbbb', roll, pitch, yaw, throttle, flags)
+try:
+    e.add_peer(mac_address, b'')
+    print(f"Peer was added: {mac_address}")
+except Exception as err:
+    print(f"Error of adding peer {err}")
+    
+counter = 0
 
 while True:
+    text = f"Hello, counter is {counter}"
+    msg = text.encode()
     try:
-        if esp.any():
-            mac, msg = esp.recv(0)
-            if msg:
-                cmd = msg[0] if len(msg) > 0 else 0
-                print(f"Classic: received command: {cmd} (0x{cmd:02X})")
+        try:
+            e.send(mac_address, msg, False)
+        except TypeError:
+            e.send(mac_address, msg)
+        
+        print(f"Sended: {text}")
+        
+    except OSError as err:
+        print(f"Error {err}")
+        
+    counter += 1
+    time.sleep(2)
+    
 
-                pkt = make_packet()
-                roll, pitch, yaw, throttle, flags = struct.unpack('bbbbb', pkt[1:])
-                print(f"Classic: sending -> roll={roll}, pitch={pitch}, yaw={yaw}, throttle={throttle}, flags={flags}")
-
-                try:
-                    esp.send(PEER_MAC, pkt)
-                except OSError as e:
-                    print("Classic: send error:", e)
-    except OSError as e:
-        print("Classic: loop error:", e)
-
-    time.sleep_ms(1)
