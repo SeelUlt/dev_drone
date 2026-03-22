@@ -13,6 +13,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include <stdio.h>
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -47,7 +48,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 
 /* USER CODE END 0 */
 
@@ -87,17 +87,9 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   HAL_TIM_Base_Start_IT(&htim2);
-  /* USER CODE BEGIN 2 */
-  uint8_t cmd = 0x01;
-  uint8_t sync;
-  uint8_t packet[5];
-  uint8_t dummy;
-  uint8_t byte;
-  //uint8_t packet[5];
-  //uint8_t cmd = 0x01;
-  uint8_t rx[6];
-  //while (HAL_UART_Receive(&huart2, &dummy, 1, 0) == HAL_OK) {}
 
+  /* USER CODE BEGIN 2 */
+  printf("STM32 active\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,28 +99,27 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  while (1)
-	  {
-	      // ищем sync байт
+    uint8_t byte;
 
-	      if (HAL_UART_Receive(&huart2, &byte, 1, HAL_MAX_DELAY) == HAL_OK)
-	      {
-	          if (byte == 0xAA)
-	          {
-	              // читаем пакет
-	              if (HAL_UART_Receive(&huart2, packet, 5, 100) == HAL_OK)
-	              {
-	                  printf("R:%d P:%d Y:%d T:%d F:%d\r\n",
-	                         (int8_t)packet[0],
-	                         (int8_t)packet[1],
-	                         (int8_t)packet[2],
-	                         (int8_t)packet[3],
-	                         (int8_t)packet[4]);
-	              }
-	          }
-	      }
-	  }
-
+    // Постоянно слушаем UART2 (соединён с ESP32-C3)
+    // Ждём байт синхронизации 0xAA
+    if (HAL_UART_Receive(&huart2, &byte, 1, HAL_MAX_DELAY) == HAL_OK)
+    {
+        if (byte == 0xAA)
+        {
+            uint8_t packet[5];
+            // Читаем 5 байт данных с увеличенным таймаутом (500 мс)
+            if (HAL_UART_Receive(&huart2, packet, 5, 500) == HAL_OK)
+            {
+                printf("R:%d P:%d Y:%d T:%d F:%d\r\n",
+                       (int8_t)packet[0],
+                       (int8_t)packet[1],
+                       (int8_t)packet[2],
+                       (int8_t)packet[3],
+                       (int8_t)packet[4]);
+            }
+        }
+    }
     /* USER CODE END 3 */
   }
 }
@@ -199,6 +190,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
