@@ -1,41 +1,37 @@
 import network
 import espnow
-import sys
 import time
+import random
 import struct
 
-# --- КОНФИГУРАЦИЯ ---
-PEER_MAC = b'\x1c\xdb\xd4\xc3\xc9\x30'  # MAC-адрес C3 Mini
+PEER_MAC = b'\x1c\xdb\xd4\xc3\xc9\x30'  # MAC C3
 
-# --- ИНИЦИАЛИЗАЦИЯ ---
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
+wlan.config(channel=1)
 
 esp = espnow.ESPNow()
 esp.active(True)
 esp.add_peer(PEER_MAC)
 
-print("ESP32 Classic Bridge (USB -> ESP-NOW) Ready")
+print("ESP32 Classic generator ready")
 
-buffer = bytearray()
-EXPECTED_LEN = 5
+BASE = [10, 10, 10, 50, 1]
+
+def make_packet():
+    roll = BASE[0] + random.randint(-5, 5)
+    pitch = BASE[1] + random.randint(-5, 5)
+    yaw = BASE[2] + random.randint(-5, 5)
+    throttle = BASE[3] + random.randint(-5, 5)
+    flags = BASE[4]
+
+    return struct.pack('bbbbb', roll, pitch, yaw, throttle, flags)
 
 while True:
-    # Читаем 1 байт из USB (от Raspberry Pi)
-    data = sys.stdin.buffer.read(1)
-    
-    if data:
-        byte = data[0]
-        buffer.append(byte)
-        
-        # Если накопили 5 байт — отправляем пакет
-        if len(buffer) == EXPECTED_LEN:
-            try:
-                esp.send(PEER_MAC, bytes(buffer))
-                # Раскомментируйте для отладки:
-                # print(f"Sent: {list(buffer)}") 
-            except Exception as e:
-                print(f"ESP-NOW Error: {e}")
-            buffer = bytearray()
-    
-    time.sleep_ms(2)
+    if esp.any():
+        mac, msg = esp.recv(0)
+        if msg:
+            pkt = struct.pack(10, 10, 10, 10, 10) #make_packet()
+            esp.send(PEER_MAC, pkt)
+
+    time.sleep_ms(1)
