@@ -23,6 +23,12 @@ mac_address = b'\x1c\xdb\xd4\xc3\xc9\x30'
 e = espnow.ESPNow()
 e.active(True)
 
+def to_bytes(x, y):
+    # Преобразуем signed int (-128...127) в unsigned байт (0...255)
+    x_byte = x & 0xFF
+    y_byte = y & 0xFF
+    return bytes([x_byte, y_byte])
+
 def normalize_axis(val):
     val = (val - 2048) // 16
     if abs(val) < DEADZONE:
@@ -42,8 +48,7 @@ while True:
     x_val = normalize_axis(adc_x.read())
     y_val = normalize_axis(adc_y.read())
     print(f"X: {x_val}, Y: {y_val}")
-    msg = f"X:{x_val},Y:{y_val}"
-    msg = msg.encode()
+    msg = to_bytes(x_val, y_val)
     try:
         try:
             e.send(mac_address, msg, False)
