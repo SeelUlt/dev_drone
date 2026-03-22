@@ -42,19 +42,19 @@ while True:
     x_val = normalize_axis(adc_x.read())
     y_val = normalize_axis(adc_y.read())
     print(f"X: {x_val}, Y: {y_val}")
-    msg = text.encode()
+    msg = f"X:{x_val},Y:{y_val}"
+    msg = msg.encode()
     try:
         try:
             e.send(mac_address, msg, False)
         except TypeError:
             e.send(mac_address, msg)
         
-        print(f"Sended: {text}")
-        
     except OSError as err:
         print(f"Error {err}")
         
     counter += 1
+    print(f"counter: {counter}")
     time.sleep(0.5)
     
 
