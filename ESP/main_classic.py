@@ -3,71 +3,71 @@ import espnow
 import time
 from machine import ADC, Pin
 
-DEADZONE = 10
-
-PIN_X = 34
-PIN_Y = 35
-
-adc_x = ADC(Pin(PIN_X))
-adc_y = ADC(Pin(PIN_Y))
-
-adc_x.atten(ADC.ATTN_11DB)
-adc_y.atten(ADC.ATTN_11DB)
-
-wlan = network.WLAN(network.STA_IF)
-wlan.active(True)
-wlan.config(channel=3)
-
-mac_address = b'\x1c\xdb\xd4\xc3\xc9\x30'
-
-e = espnow.ESPNow()
-e.active(True)
-
-def to_bytes(x, y):
-    # Преобразуем signed int (-128...127) в unsigned байт (0...255)
-    x_byte = x & 0xFF
-    y_byte = y & 0xFF
-    return bytes([x_byte, y_byte])
-
-def normalize_axis(val):
-    val = (val - 2048) // 16
-    if abs(val) < DEADZONE:
-        return 0
-    else: return val
+print("🚀 Start...")
 
 try:
-    e.add_peer(mac_address, b'')
-    print(f"Peer was added: {mac_address}")
-except Exception as err:
-    print(f"Error of adding peer {err}")
-    
-counter = 0
+    # ================= НАСТРОЙКИ =================
+    WIFI_CHANNEL = 3
+    PEER_MAC = b'\x1c\xdb\xd4\xc3\xc9\x30'
+    # b'\x1c\xdb\xd4\xc3\xc90'
+    # 1c:db:d4:c3:c9:30
+    # b'\x1c\xdb\xd4\xc3\xc9\x30'
+    PIN_X = 34
+    PIN_Y = 35
+    ADC_CENTER_X = 2546
+    ADC_CENTER_Y = 1189
+    DEADZONE = 15
+    DEBUG = True  # ← Включи отладку, чтобы видеть ошибки
+    # =============================================
 
-while True:
-    text = f"Hello, counter is {counter}"
-<<<<<<< HEAD
-=======
-    print(f"raw data: x: {adc_x.read()}, y:{adc_y.read()}")
->>>>>>> 0edbd71 (full working espnow and simple usart)
-    x_val = normalize_axis(adc_x.read())
-    y_val = normalize_axis(adc_y.read())
-    print(f"X: {x_val}, Y: {y_val}")
-    msg = to_bytes(x_val, y_val)
-    try:
+    # 1. ADC
+    print("1. Init ADC...")
+    adc_x = ADC(Pin(PIN_X))
+    adc_y = ADC(Pin(PIN_Y))
+    adc_x.atten(ADC.ATTN_11DB)
+    adc_y.atten(ADC.ATTN_11DB)
+
+    # 2. WiFi (режим STA без подключения)
+    print("2. Init WiFi...")
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    wlan.config(channel=WIFI_CHANNEL)
+
+    # 3. ESP-NOW
+    print("3. Init ESP-NOW...")
+    e = espnow.ESPNow()
+    e.active(True)
+    e.add_peer(PEER_MAC, b'')
+    
+    print("✅ Ready!")
+
+    # 4. Главный цикл
+    while True:
+        raw_x = adc_x.read()
+        raw_y = adc_y.read()
+        
+        x_val = (raw_x - ADC_CENTER_X) // 16
+        y_val = (raw_y - ADC_CENTER_Y) // 16
+        
+        if abs(x_val) < DEADZONE: x_val = 0
+        if abs(y_val) < DEADZONE: y_val = 0
+        
+        x_val = max(-128, min(127, x_val))
+        y_val = max(-128, min(127, y_val))
+        
+        msg = bytes([x_val & 0xFF, y_val & 0xFF])
+        
         try:
-            e.send(mac_address, msg, False)
-        except TypeError:
-            e.send(mac_address, msg)
+            e.send(PEER_MAC, msg)
+            if DEBUG:
+                print(f"X:{x_val:4d} Y:{y_val:4d}")
+        except Exception as err:
+            if DEBUG:
+                print(f"Send err: {err}")
         
-    except OSError as err:
-        print(f"Error {err}")
-        
-    counter += 1
-    print(f"counter: {counter}")
-    time.sleep(0.5)
-    
+        time.sleep(0.01)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 0edbd71 (full working espnow and simple usart)
+except Exception as e:
+    # ← Если код упадёт здесь, ты увидишь причину!
+    print(f"❌ CRITICAL ERROR: {e}")
+    time.sleep(2)

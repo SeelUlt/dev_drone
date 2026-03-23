@@ -32,7 +32,7 @@ def on_recv(status):
             joy_y = msg[1] if msg[1] < 128 else msg[1] - 256
             #print(f"X:{joy_x:4d}  Y:{joy_y:4d}")
             uart.write(msg)
-            time.sleep(0.2)
+            #.sleep(0.2)
         except:
             pass
     
@@ -42,8 +42,8 @@ print("Recieve is start")
 
 try:
     while True:
-        print(f"X:{joy_x:4d}  Y:{joy_y:4d}")
-        time.sleep(1)
+        print(f"C3 X:{joy_x:4d}  Y:{joy_y:4d}")
+        time.sleep(0.1)
 except KeyboardInterrupt:
     e.active(False)
     wlan.active(False)
