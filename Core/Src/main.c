@@ -16,6 +16,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "icm20948.h"
+#include "madgwick.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +49,11 @@ static uint8_t uart_rx_byte;
 static uint8_t uart_state = 0;
 static uint8_t uart_buf[RC_PACKET_SIZE];
 
+#define PI_reverse_180 57.2957795f
+
+MadgwickFilter Filter;
+euler_t angles = {0};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,7 +64,55 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void init_fail_detector(init_status status){
+	switch(status)
+	{
+	    case init_success:
+	        printf("Init success\r\n");
+	        break;
 
+	    case who_am_i_fail:
+	        printf("WHO_AM_I failed\r\n");
+	        break;
+
+	    case reset_fail:
+	        printf("Reset failed\r\n");
+	        break;
+
+	    case wake_up_fail:
+	        printf("Wake up failed\r\n");
+	        break;
+
+	    case clock_source_fail:
+	        printf("Clock source config failed\r\n");
+	        break;
+
+	    case odr_fail:
+	        printf("ODR align failed\r\n");
+	        break;
+
+	    case spi_slave_enable_fail:
+	        printf("SPI slave enable failed\r\n");
+	        break;
+
+	    case gyro_srd_fail:
+	        printf("Gyro sample rate divider failed\r\n");
+	        break;
+
+	    case gyro_fsf_fail:
+	        printf("Gyro full scale config failed\r\n");
+	        break;
+
+	    case accel_fsf_fail:
+	        printf("Accel full scale config failed\r\n");
+	        break;
+
+	    default:
+	        printf("Unknown init error\r\n");
+	        break;
+	}
+
+}
 /* USER CODE END 0 */
 
 /**
@@ -101,6 +156,21 @@ int main(void)
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);    // Низкий приоритет
   // Запуск приёма UART через прерывание
   HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
+
+  HAL_GPIO_WritePin(spi_cs_port, spi_cs_pin, SET);
+
+  if (who_am_i() == HAL_OK){printf("Im here!\r\n");}
+    else {printf("Its so sad\r\n");}
+    init_status init_st = icm20948_init(_500dps, _4g, 1);
+    if (init_st != init_success){
+  	  printf("Init error\r\n");
+    }
+    else{
+  	  printf("Init success\r\n");
+    }
+    init_fail_detector(init_st);
+
+    madgwick_init(&Filter, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,11 +183,29 @@ int main(void)
 	    static uint32_t last_print = 0;
 
 	    // Печать не чаще 10 раз в секунду (каждые 100 мс)
-	    if (HAL_GetTick() - last_print > 100)
+	    if (HAL_GetTick() - last_print > 2000)
 	    {
+	    	axis_raw_t test_accel, test_gyro;
+	    	printf("Testing IMU...\r\n");
+
+	    	for (int i = 0; i < 5; i++) {
+	    	    icm20948_accel_read(&test_accel);
+	    	    icm20948_gyro_read(&test_gyro);
+
+	    	    printf("Test %d: Accel=[%6d %6d %6d]  Gyro=[%6d %6d %6d]\r\n",
+	    	           i,
+	    	           test_accel.x, test_accel.y, test_accel.z,
+	    	           test_gyro.x, test_gyro.y, test_gyro.z);
+	    	}
+
 	        last_print = HAL_GetTick();
 	        printf("DBG: valid=%d | r=%4d p=%4d\r\n",
 	               rc_valid, rc_roll, rc_pitch);
+
+	        printf("Roll: %6d Pitch: %6d Yaw: %6d\r\n",
+	        		(int)(angles.roll),
+					(int)(angles.pitch),
+					(int)(angles.yaw));
 	    }
 	  /*
 	uint8_t packet[2] = {0};
@@ -212,6 +300,11 @@ void RC_Process_Failure(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+	static axis_raw_t accel;
+	static axis_raw_t gyro;
+	static axis_scaled_t scaled_accel;
+	static axis_scaled_t scaled_gyro;
+
     if (htim->Instance == TIM2)
     {
         imu_flag = 1;
@@ -223,7 +316,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         } else {
             HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
         }
+
+        // orientation cycle
+        icm20948_gyro_read(&gyro);
+        icm20948_accel_read(&accel);
+
+        icm20948_scale_gyro(&gyro, &scaled_gyro);
+        icm20948_scale_accel(&accel, &scaled_accel);
+
+        icm20948_primary_accel_calib(&scaled_accel);
+        icm20948_apply_calib(&scaled_accel, &scaled_gyro);
+
+        madgwick_run(&Filter, &scaled_accel, &scaled_gyro);
+
+        angles = madgwick_get_euler(&Filter); // получаем из данных фильтра углы Эйлера, то есть текущее положение
+        angles.roll = angles.roll * PI_reverse_180;	 // датчика в градусах
+        angles.pitch = angles.pitch * PI_reverse_180;
+        angles.yaw = angles.yaw * PI_reverse_180;
     }
+
 }
 
 /* USER CODE END 4 */

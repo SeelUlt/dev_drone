@@ -1,5 +1,6 @@
-"./Core/Src/esp_bridge.o"
 "./Core/Src/gpio.o"
+"./Core/Src/icm20948.o"
+"./Core/Src/madgwick.o"
 "./Core/Src/main.o"
 "./Core/Src/spi.o"
 "./Core/Src/stm32f4xx_hal_msp.o"

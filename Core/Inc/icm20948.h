@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 #define spi (&hspi1)
-#define spi_cs_pin GPIO_PIN_4
-#define spi_cs_port GPIOA
+#define spi_cs_pin GPIO_PIN_1
+#define spi_cs_port GPIOB
 
 #define READ 0x80
 #define WRITE 0x00

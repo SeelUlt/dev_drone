@@ -1,3 +1,0 @@
-../Core/Src/esp_bridge.c:10:6:ESP_Init	16	static
-../Core/Src/esp_bridge.c:17:6:ESP_Poll	48	static
-../Core/Src/esp_bridge.c:71:9:ESP_CheckTimeout	16	static

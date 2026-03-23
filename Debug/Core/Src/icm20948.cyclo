@@ -1,0 +1,17 @@
+../Core/Src/icm20948.c:25:13:icm20948_init	22
+../Core/Src/icm20948.c:121:19:who_am_i	2
+../Core/Src/icm20948.c:129:13:cs_low	1
+../Core/Src/icm20948.c:133:13:cs_high	1
+../Core/Src/icm20948.c:137:25:select_bank	3
+../Core/Src/icm20948.c:160:25:write_once_reg	5
+../Core/Src/icm20948.c:185:25:read_once_reg	4
+../Core/Src/icm20948.c:199:25:read_multi_reg	6
+../Core/Src/icm20948.c:234:6:icm20948_accel_read	3
+../Core/Src/icm20948.c:251:6:icm20948_gyro_read	3
+../Core/Src/icm20948.c:267:6:icm20948_scale_accel	1
+../Core/Src/icm20948.c:274:6:icm20948_scale_gyro	1
+../Core/Src/icm20948.c:283:15:accel_six_dof_calib	2
+../Core/Src/icm20948.c:306:22:gyro_six_dof_calib	2
+../Core/Src/icm20948.c:329:6:icm20948_primary_accel_calib	1
+../Core/Src/icm20948.c:337:13:icm20948_calib	1
+../Core/Src/icm20948.c:351:6:icm20948_apply_calib	1

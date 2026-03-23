@@ -1,5 +1,5 @@
-Core/Src/esp_bridge.o: ../Core/Src/esp_bridge.c ../Core/Inc/esp_bridge.h \
- ../Core/Inc/usart.h ../Core/Inc/main.h \
+Core/Src/icm20948.o: ../Core/Src/icm20948.c ../Core/Inc/icm20948.h \
+ ../Core/Inc/spi.h ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -28,10 +28,9 @@ Core/Src/esp_bridge.o: ../Core/Src/esp_bridge.c ../Core/Inc/esp_bridge.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_spi.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
- ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/main.h
-../Core/Inc/esp_bridge.h:
-../Core/Inc/usart.h:
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
+../Core/Inc/icm20948.h:
+../Core/Inc/spi.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -62,4 +61,3 @@ Core/Src/esp_bridge.o: ../Core/Src/esp_bridge.c ../Core/Inc/esp_bridge.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
-../Core/Inc/main.h:
