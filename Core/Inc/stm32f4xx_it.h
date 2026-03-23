@@ -57,14 +57,9 @@ void PendSV_Handler(void);
 void SysTick_Handler(void);
 void EXTI9_5_IRQHandler(void);
 void TIM2_IRQHandler(void);
+void USART2_IRQHandler(void);
 /* USER CODE BEGIN EFP */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM2)
-    {
-        imu_flag = 1;
-    }
-}
+
 /* USER CODE END EFP */
 
 #ifdef __cplusplus

@@ -12,12 +12,10 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include <stdio.h>
-#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,6 +37,16 @@
 
 /* USER CODE BEGIN PV */
 volatile uint8_t imu_flag = 0;
+#define RC_PACKET_SIZE 2
+volatile int8_t rc_roll = 0;
+volatile int8_t rc_pitch = 0;
+volatile uint32_t rc_last_update = 0;
+volatile uint8_t rc_valid = 0;
+
+static uint8_t uart_rx_byte;
+static uint8_t uart_state = 0;
+static uint8_t uart_buf[RC_PACKET_SIZE];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -87,10 +95,12 @@ int main(void)
   MX_TIM4_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  HAL_TIM_Base_Start_IT(&htim2);
-
   /* USER CODE BEGIN 2 */
   printf("STM32 active\r\n");
+  HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);      // Высший приоритет
+  HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);    // Низкий приоритет
+  // Запуск приёма UART через прерывание
+  HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -100,15 +110,25 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	    static uint32_t last_print = 0;
+
+	    // Печать не чаще 10 раз в секунду (каждые 100 мс)
+	    if (HAL_GetTick() - last_print > 100)
+	    {
+	        last_print = HAL_GetTick();
+	        printf("DBG: valid=%d | r=%4d p=%4d\r\n",
+	               rc_valid, rc_roll, rc_pitch);
+	    }
+	  /*
 	uint8_t packet[2] = {0};
     if (HAL_UART_Receive(&huart2, packet, 2, 5) == HAL_OK){
     int8_t converted[2] = {(int8_t)packet[0], (int8_t)packet[1]};
     printf("first bit: %d, second bit: %d\r\n", converted[0], converted[1]);
     }
-    /* USER CODE END 3 */
-  }
+    */
+  /* USER CODE END 3 */
 }
-
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -157,6 +177,55 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+volatile uint32_t uart2_bytes_received = 0;
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART2)
+    {
+        uart2_bytes_received++;
+
+        uart_buf[uart_state] = uart_rx_byte;
+        uart_state++;
+
+        if (uart_state >= RC_PACKET_SIZE)
+        {
+            rc_roll = (int8_t)uart_buf[0];
+            rc_pitch = (int8_t)uart_buf[1];
+            rc_last_update = HAL_GetTick();
+            rc_valid = 1;
+            uart_state = 0;
+        }
+        HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
+    }
+}
+
+void RC_Process_Failure(void)
+{
+    if (rc_valid && (HAL_GetTick() - rc_last_update > 500))
+    {
+        rc_valid = 0;
+        rc_roll = 0;
+        rc_pitch = 0;
+    }
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM2)
+    {
+        imu_flag = 1;
+        RC_Process_Failure();
+
+        // Индикация: если данные есть — светодиод включен
+        if (rc_valid) {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+        } else {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+        }
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -175,7 +244,6 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
