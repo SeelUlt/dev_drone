@@ -13,6 +13,6 @@
 ../Core/Src/madgwick.c:161:16:calc_euler_angles_fixed	2
 ../Core/Src/madgwick.c:185:16:calc_euler_angles	2
 ../Core/Src/madgwick.c:218:6:madgwick_init	2
-../Core/Src/madgwick.c:239:6:madgwick_run	4
-../Core/Src/madgwick.c:289:9:madgwick_get_euler	2
-../Core/Src/madgwick.c:297:13:update_gyro_bias	6
+../Core/Src/madgwick.c:243:6:madgwick_run	4
+../Core/Src/madgwick.c:293:9:madgwick_get_euler	2
+../Core/Src/madgwick.c:301:13:update_gyro_bias	6

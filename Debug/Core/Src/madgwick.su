@@ -8,11 +8,11 @@
 ../Core/Src/madgwick.c:85:22:calc_expected_accel_vector	64	static
 ../Core/Src/madgwick.c:106:22:calc_accel_vector_error	64	static
 ../Core/Src/madgwick.c:126:22:angle_speed_correction	64	static
-../Core/Src/madgwick.c:136:15:calc_d_quat	88	static
+../Core/Src/madgwick.c:136:15:calc_d_quat	96	static
 ../Core/Src/madgwick.c:151:15:calc_current_quat	64	static
 ../Core/Src/madgwick.c:161:16:calc_euler_angles_fixed	80	static
 ../Core/Src/madgwick.c:185:16:calc_euler_angles	80	static
 ../Core/Src/madgwick.c:218:6:madgwick_init	16	static
-../Core/Src/madgwick.c:239:6:madgwick_run	128	static
-../Core/Src/madgwick.c:289:9:madgwick_get_euler	56	static
-../Core/Src/madgwick.c:297:13:update_gyro_bias	40	static
+../Core/Src/madgwick.c:243:6:madgwick_run	128	static
+../Core/Src/madgwick.c:293:9:madgwick_get_euler	56	static
+../Core/Src/madgwick.c:301:13:update_gyro_bias	48	static

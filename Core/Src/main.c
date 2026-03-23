@@ -52,7 +52,7 @@ static uint8_t uart_buf[RC_PACKET_SIZE];
 #define PI_reverse_180 57.2957795f
 
 MadgwickFilter Filter;
-euler_t angles = {0};
+volatile euler_t angles = {0};
 
 /* USER CODE END PV */
 
@@ -156,7 +156,7 @@ int main(void)
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);    // Низкий приоритет
   // Запуск приёма UART через прерывание
   HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
-
+  HAL_TIM_Base_Start_IT(&htim2);
   HAL_GPIO_WritePin(spi_cs_port, spi_cs_pin, SET);
 
   if (who_am_i() == HAL_OK){printf("Im here!\r\n");}
@@ -171,6 +171,8 @@ int main(void)
     init_fail_detector(init_st);
 
     madgwick_init(&Filter, 1);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -183,21 +185,8 @@ int main(void)
 	    static uint32_t last_print = 0;
 
 	    // Печать не чаще 10 раз в секунду (каждые 100 мс)
-	    if (HAL_GetTick() - last_print > 2000)
+	    if (HAL_GetTick() - last_print > 500)
 	    {
-	    	axis_raw_t test_accel, test_gyro;
-	    	printf("Testing IMU...\r\n");
-
-	    	for (int i = 0; i < 5; i++) {
-	    	    icm20948_accel_read(&test_accel);
-	    	    icm20948_gyro_read(&test_gyro);
-
-	    	    printf("Test %d: Accel=[%6d %6d %6d]  Gyro=[%6d %6d %6d]\r\n",
-	    	           i,
-	    	           test_accel.x, test_accel.y, test_accel.z,
-	    	           test_gyro.x, test_gyro.y, test_gyro.z);
-	    	}
-
 	        last_print = HAL_GetTick();
 	        printf("DBG: valid=%d | r=%4d p=%4d\r\n",
 	               rc_valid, rc_roll, rc_pitch);
@@ -300,41 +289,47 @@ void RC_Process_Failure(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	static axis_raw_t accel;
-	static axis_raw_t gyro;
-	static axis_scaled_t scaled_accel;
-	static axis_scaled_t scaled_gyro;
+    static axis_raw_t accel;
+    static axis_raw_t gyro;
+    static axis_scaled_t scaled_accel;
+    static axis_scaled_t scaled_gyro;
 
     if (htim->Instance == TIM2)
     {
+        // === ПРОВЕРКА: Мигаем светодиодом при каждом 250-м вызове (раз в 0.5 сек) ===
+        static uint32_t tick_counter = 0;
+        tick_counter++;
+
+        if (tick_counter % 250 == 0) {
+            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);  // Мигание = таймер работает!
+        }
+
+        // === Твой существующий код обработки ===
         imu_flag = 1;
         RC_Process_Failure();
 
-        // Индикация: если данные есть — светодиод включен
         if (rc_valid) {
             HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
         } else {
             HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
         }
 
-        // orientation cycle
-        icm20948_gyro_read(&gyro);
+        // Чтение и обработка...
         icm20948_accel_read(&accel);
-
-        icm20948_scale_gyro(&gyro, &scaled_gyro);
+        icm20948_gyro_read(&gyro);
         icm20948_scale_accel(&accel, &scaled_accel);
-
-        icm20948_primary_accel_calib(&scaled_accel);
+        icm20948_scale_gyro(&gyro, &scaled_gyro);
         icm20948_apply_calib(&scaled_accel, &scaled_gyro);
+
 
         madgwick_run(&Filter, &scaled_accel, &scaled_gyro);
 
-        angles = madgwick_get_euler(&Filter); // получаем из данных фильтра углы Эйлера, то есть текущее положение
-        angles.roll = angles.roll * PI_reverse_180;	 // датчика в градусах
-        angles.pitch = angles.pitch * PI_reverse_180;
-        angles.yaw = angles.yaw * PI_reverse_180;
+        // Обновляем глобальные volatile углы
+        euler_t temp = madgwick_get_euler(&Filter);
+        angles.roll = temp.roll * PI_reverse_180;
+        angles.pitch = temp.pitch * PI_reverse_180;
+        angles.yaw = temp.yaw * PI_reverse_180;
     }
-
 }
 
 /* USER CODE END 4 */

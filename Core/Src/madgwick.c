@@ -140,10 +140,10 @@ static quat_t calc_d_quat(const quat_t *q, const axis_scaled_t *angle_speed, flo
 	float wy = angle_speed->y;
 	float wz = angle_speed->z;
 
-	dq.w = 0.5f * (-q->x * wx - q->y * wy - q->z * wz) * dt;
-	dq.x = 0.5f * (q->w * wx + q->y * wz - q->z * wy) * dt;
-	dq.y = 0.5f * (q->w * wy - q->x * wz + q->z * wx) * dt;
-	dq.z = 0.5f * (q->w * wz + q->x * wy - q->y * wx) * dt;
+	dq.w = 0.5f * (-q->x * wx - q->y * wy - q->z * wz) * 0.002;
+	dq.x = 0.5f * (q->w * wx + q->y * wz - q->z * wy) * 0.002;
+	dq.y = 0.5f * (q->w * wy - q->x * wz + q->z * wx) * 0.002;
+	dq.z = 0.5f * (q->w * wz + q->x * wy - q->y * wx) * 0.002;
 
 	return dq;
 }
@@ -231,6 +231,10 @@ void madgwick_init(MadgwickFilter *filter, float dt){
 	filter->gyro_bias.y = 0.0f;
 	filter->gyro_bias.z = 0.0f;
 
+    filter->bias_integrator.x = 0.0f;
+    filter->bias_integrator.y = 0.0f;
+    filter->bias_integrator.z = 0.0f;
+
 	// Инициализация времени
 
 	filter->last_time = get_time_us();
@@ -261,7 +265,7 @@ void madgwick_run(MadgwickFilter *filter,
                      &gyro_unbiased,
                      &accel,
                      &error,
-                     dt);
+                     0.002);
 
     // Теперь вычитаем bias
     axis_scaled_t gyro;
@@ -313,9 +317,9 @@ static void update_gyro_bias(MadgwickFilter *f,
         gyro_norm < GYRO_STILL)
     {
         // Интегратор
-        f->bias_integrator.x += error->x * KI_BIAS * dt;
-        f->bias_integrator.y += error->y * KI_BIAS * dt;
-        f->bias_integrator.z += error->z * KI_BIAS * dt;
+        f->bias_integrator.x += error->x * KI_BIAS * 0.002;
+        f->bias_integrator.y += error->y * KI_BIAS * 0.002;
+        f->bias_integrator.z += error->z * KI_BIAS * 0.002;
 
         // Ограничение
         if (fabsf(f->bias_integrator.x) > MAX_BIAS)
