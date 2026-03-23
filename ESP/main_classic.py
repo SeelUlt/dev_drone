@@ -45,6 +45,10 @@ counter = 0
 
 while True:
     text = f"Hello, counter is {counter}"
+<<<<<<< HEAD
+=======
+    print(f"raw data: x: {adc_x.read()}, y:{adc_y.read()}")
+>>>>>>> 0edbd71 (full working espnow and simple usart)
     x_val = normalize_axis(adc_x.read())
     y_val = normalize_axis(adc_y.read())
     print(f"X: {x_val}, Y: {y_val}")
@@ -63,3 +67,7 @@ while True:
     time.sleep(0.5)
     
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0edbd71 (full working espnow and simple usart)

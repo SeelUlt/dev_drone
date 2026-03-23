@@ -13,6 +13,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include <stdio.h>
+#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -99,26 +100,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    uint8_t byte;
-
-    // Постоянно слушаем UART2 (соединён с ESP32-C3)
-    // Ждём байт синхронизации 0xAA
-    if (HAL_UART_Receive(&huart2, &byte, 1, HAL_MAX_DELAY) == HAL_OK)
-    {
-        if (byte == 0xAA)
-        {
-            uint8_t packet[5];
-            // Читаем 5 байт данных с увеличенным таймаутом (500 мс)
-            if (HAL_UART_Receive(&huart2, packet, 5, 500) == HAL_OK)
-            {
-                printf("R:%d P:%d Y:%d T:%d F:%d\r\n",
-                       (int8_t)packet[0],
-                       (int8_t)packet[1],
-                       (int8_t)packet[2],
-                       (int8_t)packet[3],
-                       (int8_t)packet[4]);
-            }
-        }
+	uint8_t packet[2] = {0};
+    if (HAL_UART_Receive(&huart2, packet, 2, 5) == HAL_OK){
+    int8_t converted[2] = {(int8_t)packet[0], (int8_t)packet[1]};
+    printf("first bit: %d, second bit: %d\r\n", converted[0], converted[1]);
     }
     /* USER CODE END 3 */
   }
