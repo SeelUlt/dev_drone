@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define spi (&hspi1)
-#define spi_cs_pin GPIO_PIN_1
+#define spi_cs_pin GPIO_PIN_0
 #define spi_cs_port GPIOB
 
 #define READ 0x80

@@ -67,7 +67,7 @@ void Error_Handler(void);
 #define ICM_MISO_GPIO_Port GPIOA
 #define ICM_MOSI_Pin GPIO_PIN_7
 #define ICM_MOSI_GPIO_Port GPIOA
-#define ICM_CS_Pin GPIO_PIN_1
+#define ICM_CS_Pin GPIO_PIN_0
 #define ICM_CS_GPIO_Port GPIOB
 #define LORA_CS_Pin GPIO_PIN_2
 #define LORA_CS_GPIO_Port GPIOB

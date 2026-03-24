@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "icm20948.h"
 #include "madgwick.h"
+#include "motor_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -161,6 +162,7 @@ int main(void)
 
   if (who_am_i() == HAL_OK){printf("Im here!\r\n");}
     else {printf("Its so sad\r\n");}
+    // Инициализация icm 
     init_status init_st = icm20948_init(_500dps, _4g, 1);
     if (init_st != init_success){
   	  printf("Init error\r\n");
@@ -170,6 +172,7 @@ int main(void)
     }
     init_fail_detector(init_st);
 
+    // Инициализация фильтра 
     madgwick_init(&Filter, 1);
 
 
@@ -206,6 +209,7 @@ int main(void)
   /* USER CODE END 3 */
 }
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -319,6 +323,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         icm20948_gyro_read(&gyro);
         icm20948_scale_accel(&accel, &scaled_accel);
         icm20948_scale_gyro(&gyro, &scaled_gyro);
+        icm20948_apply_calib(&scaled_accel, &scaled_gyro);
+
+        icm20948_primary_accel_calib(&scaled_accel);
         icm20948_apply_calib(&scaled_accel, &scaled_gyro);
 
 
