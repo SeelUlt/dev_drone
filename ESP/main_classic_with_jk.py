@@ -1,46 +1,55 @@
 import network
 import espnow
-from machine import UART, Pin
+import sys
+import uselect
 import time
 
-# Настройка Wi-Fi и ESP-NOW
+# 1. Настройка Wi-Fi
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
-wlan.config(channel=1) # Обязательно один канал с приемником
+wlan.config(channel=1)
 
+# 2. Настройка ESP-NOW
 e = espnow.ESPNow()
 e.active(True)
-
-# Твой MAC-адрес C3 Super Mini в байтовом виде
-PEER_MAC = b'\x1c\xdb\xd4\xc3\xc9\x30' 
-
+PEER_MAC = b'\x1c\xdb\xd4\xc3\xc9\x30' # Проверь MAC своей C3!
 try:
     e.add_peer(PEER_MAC)
-    print("Peer C3 added!")
 except:
-    print("Peer already exists or error")
+    pass
 
-# Настройка UART2 (от ПК)
-uart = UART(2, baudrate=115200, rx=16, tx=17, timeout=5)
+# 3. Настройка поллинга для USB-порта
+poll = uselect.poll()
+poll.register(sys.stdin, uselect.POLLIN)
+
 HEADER = 0xAA
 PACKET_SIZE = 9
+buffer = bytearray()
 
-print("Transmitter is running...")
+print("USB MODE ACTIVE: Send packets from PC now...")
 
 while True:
-    if uart.any() >= PACKET_SIZE:
-        # Ищем заголовок, чтобы не слать мусор
-        byte = uart.read(1)
-        if byte and byte[0] == HEADER:
-            payload = uart.read(PACKET_SIZE - 1)
-            if len(payload) == PACKET_SIZE - 1:
-                # Собираем полный пакет для отправки
-                full_packet = byte + payload
+    # Проверяем, есть ли данные в USB-порту
+    if poll.poll(0): 
+        char = sys.stdin.buffer.read(1)
+        if char:
+            byte = char[0]
+            
+            if len(buffer) == 0 and byte == HEADER:
+                buffer.append(byte)
+            elif len(buffer) > 0:
+                buffer.append(byte)
                 
-                # Отправляем по воздуху
+            if len(buffer) == PACKET_SIZE:
+                # Пакет собран — пуляем в ESP-NOW
                 try:
-                    e.send(PEER_MAC, full_packet, False) # False - не ждать подтверждения для скорости
-                except Exception as err:
-                    print("Send error:", err)
-    
+                    e.send(PEER_MAC, buffer, False)
+                except:
+                    pass
+                buffer = bytearray() # Очистка буфера
+
+    # Если буфер застрял (мусор), чистим его по таймауту
+    if len(buffer) > 0 and time.ticks_diff(time.ticks_ms(), time.ticks_ms()) > 100:
+        buffer = bytearray()
+
     time.sleep_ms(1)

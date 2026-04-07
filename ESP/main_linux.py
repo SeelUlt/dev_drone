@@ -7,7 +7,7 @@ packet_id = 0
 HEADER = 0xAA
 btn = 0
 
-ser = serial.Serial('/dev/ttyUSB1', 115200)  # Настройка порта и скорости
+ser = serial.Serial('/dev/ttyUSB0', 115200)  # Настройка порта и скорости
 
 # Запуск системы
 # cd ~/drone_dev/python

@@ -39,21 +39,24 @@
 
 /* USER CODE BEGIN PV */
 volatile uint8_t imu_flag = 0;
-#define RC_PACKET_SIZE 2
-volatile int8_t rc_roll = 0;
-volatile int8_t rc_pitch = 0;
+
+// --- Новый протокол RC ---
+#define RC_PACKET_SIZE 9
+#define RC_HEADER 0xAA
+
+volatile int8_t rc_lx, rc_ly, rc_rx, rc_ry, rc_throttle;
+volatile uint8_t rc_buttons;
 volatile uint32_t rc_last_update = 0;
 volatile uint8_t rc_valid = 0;
 
 static uint8_t uart_rx_byte;
-static uint8_t uart_state = 0;
 static uint8_t uart_buf[RC_PACKET_SIZE];
+static uint8_t uart_idx = 0;
+// -------------------------
 
 #define PI_reverse_180 57.2957795f
-
 MadgwickFilter Filter;
 volatile euler_t angles = {0};
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -182,27 +185,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	    static uint32_t last_print = 0;
+	  static uint32_t last_print = 0;
 
-	    // Печать не чаще 10 раз в секунду (каждые 100 мс)
-	    if (HAL_GetTick() - last_print > 500)
-	    {
-	        last_print = HAL_GetTick();
-	        printf("DBG: valid=%d | r=%4d p=%4d\r\n",
-	               rc_valid, rc_roll, rc_pitch);
+	      if (HAL_GetTick() - last_print > 100) // Печатаем чаще (10 раз в сек)
+	      {
+	          last_print = HAL_GetTick();
 
-	        printf("Roll: %6d Pitch: %6d Yaw: %6d\r\n",
-	        		(int)(angles.roll),
-					(int)(angles.pitch),
-					(int)(angles.yaw));
-	    }
-	  /*
-	uint8_t packet[2] = {0};
-    if (HAL_UART_Receive(&huart2, packet, 2, 5) == HAL_OK){
-    int8_t converted[2] = {(int8_t)packet[0], (int8_t)packet[1]};
-    printf("first bit: %d, second bit: %d\r\n", converted[0], converted[1]);
-    }
-    */
+	          // Диагностика RC (управление)
+	          if (rc_valid) {
+	              printf("RC OK | L: %4d %4d | R: %4d %4d | Thr: %4d | BTN: %02X\r\n",
+	                     rc_lx, rc_ly, rc_rx, rc_ry, rc_throttle, rc_buttons);
+	          } else {
+	              printf("RC LOST!\r\n");
+	          }
+
+	          // Данные ориентации (IMU)
+	          printf("ANG: R:%3d P:%3d Y:%3d\r\n",
+	                 (int)(angles.roll),
+	                 (int)(angles.pitch),
+	                 (int)(angles.yaw));
+	      }
   /* USER CODE END 3 */
 }
 }
@@ -246,8 +248,8 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK){
+
     Error_Handler();
   }
 }
@@ -260,30 +262,60 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART2)
     {
-        uart2_bytes_received++;
+        // Конечный автомат разбора пакета
+        if (uart_idx == 0) {
+            if (uart_rx_byte == RC_HEADER) {
+                uart_buf[uart_idx++] = uart_rx_byte;
+            }
+        } else {
+            uart_buf[uart_idx++] = uart_rx_byte;
 
-        uart_buf[uart_state] = uart_rx_byte;
-        uart_state++;
+            if (uart_idx >= RC_PACKET_SIZE) {
+                // Пакет набран! Считаем CRC (XOR всех байт кроме последнего)
+                uint8_t calc_crc = 0;
+                for (int i = 0; i < RC_PACKET_SIZE - 1; i++) {
+                    calc_crc ^= uart_buf[i];
+                }
 
-        if (uart_state >= RC_PACKET_SIZE)
-        {
-            rc_roll = (int8_t)uart_buf[0];
-            rc_pitch = (int8_t)uart_buf[1];
-            rc_last_update = HAL_GetTick();
-            rc_valid = 1;
-            uart_state = 0;
+                if (calc_crc == uart_buf[RC_PACKET_SIZE - 1]) {
+                    // Распаковка (смещение +1 из-за заголовка 0xAA и ID)
+                    rc_lx = (int8_t)uart_buf[2];
+                    rc_ly = (int8_t)uart_buf[3];
+                    rc_rx = (int8_t)uart_buf[4];
+                    rc_ry = (int8_t)uart_buf[5];
+                    rc_throttle = (int8_t)uart_buf[6];
+                    rc_buttons = uart_buf[7];
+
+                    rc_last_update = HAL_GetTick();
+                    rc_valid = 1;
+                } else {
+                    rc_valid = 0; // Ошибка CRC
+                }
+                uart_idx = 0; // Сбрасываем для поиска нового заголовка
+            }
         }
+
+        // Перезапускаем прерывание на прием одного байта
         HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
     }
 }
 
 void RC_Process_Failure(void)
 {
+    // Если данные были валидны, но не обновлялись больше 500 мс
     if (rc_valid && (HAL_GetTick() - rc_last_update > 500))
     {
         rc_valid = 0;
-        rc_roll = 0;
-        rc_pitch = 0;
+
+        // Обнуляем все оси стиков (переводим в нейтраль)
+        rc_lx = 0;
+        rc_ly = 0;
+        rc_rx = 0;
+        rc_ry = 0;
+        rc_throttle = 0;
+        rc_buttons = 0;
+
+        printf("CRITICAL: RC Signal Lost! Failsafe active.\r\n");
     }
 }
 
