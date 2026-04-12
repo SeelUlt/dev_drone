@@ -8,6 +8,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -18,6 +19,7 @@
 #include <stdio.h>
 #include "icm20948.h"
 #include "madgwick.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,9 +51,10 @@ volatile uint8_t rc_buttons;
 volatile uint32_t rc_last_update = 0;
 volatile uint8_t rc_valid = 0;
 
-static uint8_t uart_rx_byte;
-static uint8_t uart_buf[RC_PACKET_SIZE];
-static uint8_t uart_idx = 0;
+// Кольцевой буфер
+#define RX_BUF_SIZE 64
+uint8_t dma_rx_buf[RX_BUF_SIZE];
+uint16_t read_pos = 0; // Указатель чтения
 // -------------------------
 
 #define PI_reverse_180 57.2957795f
@@ -67,6 +70,56 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void Process_UART_RingBuffer(void)
+{
+	uint16_t write_pos = RX_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart2.hdmarx);
+	    static uint32_t debug_tick = 0;
+	    static uint32_t total_packets = 0;
+	    static uint32_t crc_errors = 0;
+
+	    while (read_pos != write_pos)
+	    {
+	        uint8_t b = dma_rx_buf[read_pos];
+	        read_pos = (read_pos + 1) % RX_BUF_SIZE;
+
+	        static uint8_t packet[RC_PACKET_SIZE];
+	        static uint8_t idx = 0;
+
+	        if (idx == 0) {
+	            if (b == RC_HEADER) packet[idx++] = b;
+	        } else {
+	            packet[idx++] = b;
+	            if (idx == RC_PACKET_SIZE) {
+	                uint8_t crc = 0;
+	                for(int i = 0; i < RC_PACKET_SIZE - 1; i++) crc ^= packet[i];
+
+	                if (crc == packet[RC_PACKET_SIZE - 1]) {
+	                    rc_lx = (int8_t)packet[2];
+	                    rc_ly = (int8_t)packet[3];
+	                    rc_rx = (int8_t)packet[4];
+	                    rc_ry = (int8_t)packet[5];
+	                    rc_throttle = (int8_t)packet[6];
+	                    rc_buttons = packet[7];
+	                    rc_last_update = HAL_GetTick();
+	                    rc_valid = 1;
+	                    total_packets++;
+	                } else {
+	                    crc_errors++; // Считаем ошибки CRC
+	                }
+	                idx = 0;
+	            }
+	        }
+	    }
+
+	    // Раз в 2 секунды выводим статистику в консоль
+	    if (HAL_GetTick() - debug_tick > 2000) {
+	        printf("DEBUG: Packets: %lu | CRC Errs: %lu | DMA Pos: %u\r\n",
+	                total_packets, crc_errors, write_pos);
+	        debug_tick = HAL_GetTick();
+	    }
+}
+
 void init_fail_detector(init_status status){
 	switch(status)
 	{
@@ -147,6 +200,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_TIM2_Init();
@@ -158,8 +212,8 @@ int main(void)
   HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);      // Высший приоритет
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);    // Низкий приоритет
   // Запуск приёма UART через прерывание
-  HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
   HAL_TIM_Base_Start_IT(&htim2);
+  HAL_UART_Receive_DMA(&huart2, dma_rx_buf, RX_BUF_SIZE);
   HAL_GPIO_WritePin(spi_cs_port, spi_cs_pin, SET);
 
   if (who_am_i() == HAL_OK){printf("Im here!\r\n");}
@@ -175,7 +229,6 @@ int main(void)
 
     madgwick_init(&Filter, 1);
 
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -185,29 +238,32 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  static uint32_t last_print = 0;
+	  // 1. Вытаскиваем байты из кольцевого буфера
+	        Process_UART_RingBuffer();
 
-	      if (HAL_GetTick() - last_print > 100) // Печатаем чаще (10 раз в сек)
-	      {
-	          last_print = HAL_GetTick();
+	        static uint32_t last_print = 0;
+	        if (HAL_GetTick() - last_print > 500)
+	        {
+	            last_print = HAL_GetTick();
 
-	          // Диагностика RC (управление)
-	          if (rc_valid) {
-	              printf("RC OK | L: %4d %4d | R: %4d %4d | Thr: %4d | BTN: %02X\r\n",
-	                     rc_lx, rc_ly, rc_rx, rc_ry, rc_throttle, rc_buttons);
-	          } else {
-	              printf("RC LOST!\r\n");
-	          }
+	            // Печатаем диагностику RC
+	            if (rc_valid) {
+	                printf("RC OK | L: %4d %4d | R: %4d %4d | Thr: %4d | BTN: %02X\r\n",
+	                       rc_lx, rc_ly, rc_rx, rc_ry, rc_throttle, rc_buttons);
+	            } else {
+	                printf("RC LOST!\r\n");
+	            }
 
-	          // Данные ориентации (IMU)
-	          printf("ANG: R:%3d P:%3d Y:%3d\r\n",
-	                 (int)(angles.roll),
-	                 (int)(angles.pitch),
-	                 (int)(angles.yaw));
-	      }
+	            // 2. Данные ориентации (IMU) теперь тоже печатаем раз в 500мс
+	            printf("ANG: R:%3d P:%3d Y:%3d\r\n",
+	                   (int)(angles.roll),
+	                   (int)(angles.pitch),
+	                   (int)(angles.yaw));
+	        }
   /* USER CODE END 3 */
 }
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -249,61 +305,27 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK){
-
     Error_Handler();
-  }
 }
 
+}
 /* USER CODE BEGIN 4 */
 
 volatile uint32_t uart2_bytes_received = 0;
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (huart->Instance == USART2)
-    {
-        // Конечный автомат разбора пакета
-        if (uart_idx == 0) {
-            if (uart_rx_byte == RC_HEADER) {
-                uart_buf[uart_idx++] = uart_rx_byte;
-            }
-        } else {
-            uart_buf[uart_idx++] = uart_rx_byte;
-
-            if (uart_idx >= RC_PACKET_SIZE) {
-                // Пакет набран! Считаем CRC (XOR всех байт кроме последнего)
-                uint8_t calc_crc = 0;
-                for (int i = 0; i < RC_PACKET_SIZE - 1; i++) {
-                    calc_crc ^= uart_buf[i];
-                }
-
-                if (calc_crc == uart_buf[RC_PACKET_SIZE - 1]) {
-                    // Распаковка (смещение +1 из-за заголовка 0xAA и ID)
-                    rc_lx = (int8_t)uart_buf[2];
-                    rc_ly = (int8_t)uart_buf[3];
-                    rc_rx = (int8_t)uart_buf[4];
-                    rc_ry = (int8_t)uart_buf[5];
-                    rc_throttle = (int8_t)uart_buf[6];
-                    rc_buttons = uart_buf[7];
-
-                    rc_last_update = HAL_GetTick();
-                    rc_valid = 1;
-                } else {
-                    rc_valid = 0; // Ошибка CRC
-                }
-                uart_idx = 0; // Сбрасываем для поиска нового заголовка
-            }
-        }
-
-        // Перезапускаем прерывание на прием одного байта
-        HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
-    }
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART2) {
+	        __HAL_UART_CLEAR_OREFLAG(huart);
+	        // Если случилась беда, просто перезапускаем шарманку
+	        HAL_UART_AbortReceive(&huart2);
+	        HAL_UART_Receive_DMA(&huart2, dma_rx_buf, RX_BUF_SIZE);
+	    }
 }
 
 void RC_Process_Failure(void)
 {
     // Если данные были валидны, но не обновлялись больше 500 мс
-    if (rc_valid && (HAL_GetTick() - rc_last_update > 500))
+    if (rc_valid && (HAL_GetTick() - rc_last_update > 1000))
     {
         rc_valid = 0;
 
