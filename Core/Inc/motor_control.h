@@ -17,12 +17,22 @@
 #define MOTOR_3_CHANNEL TIM_CHANNEL_3
 #define MOTOR_4_CHANNEL TIM_CHANNEL_4
 
-/* Границы OneShot125 */
+/* Границы обычной тяги */
 #define MOTOR_THROTTLE_MIN 0
 #define MOTOR_THROTTLE_MAX 1000
 
+/* Границы OneShot125 */
 #define ONESHOT125_MIN_PULSE 125
 #define ONESHOT125_MAX_PULSE 250
+
+/* Состояние одноразового теста */
+typedef enum
+{
+    MOTOR_TEST_LOCKED = 0,   // моторы запрещены
+    MOTOR_TEST_READY,        // тест разрешён, но ещё не запущен
+    MOTOR_TEST_RUNNING,      // тест идёт
+    MOTOR_TEST_FINISHED      // тест завершён, повтор запрещён
+} MotorTestState_t;
 
 /* Внешний таймер из main.c */
 extern TIM_HandleTypeDef htim4;
@@ -50,5 +60,40 @@ uint8_t Motors_IsArmed(void);
 
 /* Тестовая последовательность моторов */
 void Motors_TestProverka(void);
+
+/* ================= ОДНОРАЗОВЫЙ ТЕСТ ================= */
+
+/*
+ * Разрешить один тест.
+ * Можно вызвать после нажатия кнопки или после задержки.
+ */
+void Motors_ArmOnce(void);
+
+/*
+ * Запустить одноразовый тест.
+ * После этого Motors_OneShotTestIsRunning() начнёт возвращать 1.
+ */
+void Motors_StartOneShotTest(void);
+
+/*
+ * Завершить одноразовый тест.
+ * Моторы выключаются, повторный запуск запрещается до reset STM32.
+ */
+void Motors_FinishOneShotTest(void);
+
+/*
+ * Проверка: можно ли сейчас писать значения в моторы.
+ */
+uint8_t Motors_OneShotTestIsRunning(void);
+
+/*
+ * Проверка: завершён ли одноразовый тест.
+ */
+uint8_t Motors_OneShotTestIsFinished(void);
+
+/*
+ * Получить текущее состояние одноразового теста.
+ */
+MotorTestState_t Motors_GetOneShotTestState(void);
 
 #endif /* INC_MOTOR_CONTROL_H_ */
